@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>欢乐斗地主</title>
+    <script src="https://code.jquery.com/jquery-3.2.1.min.js" ></script>
+    <link rel="stylesheet" href="https://alex-1256236352.cos.ap-beijing.myqcloud.com/static/layui/css/layui.css">
+    <link rel="stylesheet" href="https://alex-1256236352.cos.ap-beijing.myqcloud.com/static/layui/css/modules/layer/default/layer.css">
+</head>
+<body>
+<H1 id="title">欢乐斗地主</H1>
+
+<br>
+<br>
+<br>
+<div id="btn-group" class="layui-btn-container">
+
+</div>
+
+<div id="btn-action" class="layui-btn-container">
+<button class="layui-btn" id="card_play">出牌</button>
+<button class="layui-btn" id="btn_give_up">不要</button>
+<button class="layui-btn" id="btn-info">显示</button>
+<button class="layui-btn layui-btn-normal" id="btn_start">开始/重玩</button>
+</div>
+<script src="https://alex-1256236352.cos.ap-beijing.myqcloud.com/static/layui/layui.js" charset="UTF-8"></script>
+<script src="https://alex-1256236352.cos.ap-beijing.myqcloud.com/static/layui/lay/modules/layer.js" charset="UTF-8"></script>
+
+<script type="text/javascript" charset="UTF-8">
+    var url ='wss://ktchen.cn/room/landlordroom';
+
+    var ws = new WebSocket(url);
+
+    //卡片列表
+    var card_play = new Array();
+
+    //出牌次序
+    var myTurn = false;
+
+    $(document).ready(function(){
+
+        ws.onmessage = function(event) {
+            //服务端发送的消息
+            var data = JSON.parse(event.data);
+            if (data.type == "Warning") {
+               showWarningText(data.content);
+            }
+            if (data.type == "Message") {
+                showMessage(data.content);
+            }
+            if (data.type == "Cards") {
+                clearCardsClass();
+                var cardList = data.content;
+                cardList = cardList.substring(1, cardList.length - 1).split(",");
+                for (var i = 0; i < cardList.length; ++i) {
+                    var card = cardList[i].trim();
+                    if ($('#card_' + card).hasClass("layui-btn-disabled")) {
+                        $('#card_' + card).removeClass("layui-btn-disabled");
+                    }
+                }
+            }
+            if (data.type == "UserInfo") {
+                $('#title').text($('#title').text() + " " + data.content);
+            }
+            if (data.type == "Status") {
+                showWarningText(data.content);
+            }
+            if (data.type == "Result") {
+                showResult(data.content);
+            }
+            if (data.type == "Turn") {
+                var flag = data.content;
+                if (flag == "true")
+                    myTurn = true;
+                else
+                    myTurn = false;
+            }
+        }
+
+
+
+        //点击开始
+        $('#btn_start').click(function(){
+            var data = {
+                "type":"start"
+            }
+            ws.send(JSON.stringify(data));
+        });
+
+        //点击出牌
+        $('#card_play').click(function () {
+            if (card_play.length != 0 && myTurn) {
+                //str to int
+                for (var i = 0; i < card_play.length; i++) {
+                    card_play[i] = parseInt(card_play[i]);
+                }
+                var data = {
+                    "type":"play",
+                    "content":JSON.stringify(card_play)
+                }
+                ws.send(JSON.stringify(data));
+                card_play = new Array();
+            }
+        });
+        
+        //查看状态
+        $('#btn-info').click(function () {
+            var data = {
+                "type": "status"
+            }
+            ws.send(JSON.stringify(data));
+        })
+
+        //生成所有按钮
+        for (var i = 1; i < 55; i++) {
+            var btn = "<button class=\"layui-btn layui-btn-primary layui-btn-sm\"";
+            btn += "id=\"" + "card_" + i + "\" value=\"" + i + "\"";
+            btn += ">" + id2Str(i) + "</button>";
+            $('#btn-group').append(btn);
+            if (i % 13 == 0) {
+                $('#btn-group').append("<br>");
+            }
+        }
+
+        $('#btn_give_up').click(function () {
+            var data = {
+                "type":"giveup"
+            }
+            ws.send(JSON.stringify(data));
+        });
+
+        function clearCardsClass() {
+            for (var i = 1; i < 55; i++) {
+               $('#card_' + i).attr("class","layui-btn layui-btn-primary layui-btn-sm layui-btn-disabled");
+            }
+        }
+
+        //按钮绑定点击事件
+        for (var i = 1; i < 55; i++) {
+            $('#card_' + i).click(function () {
+                var card = $("#card_" + this.value);
+                if (!card.hasClass("layui-btn-disabled")) {//未禁用
+                    if (card.hasClass("layui-btn-primary")) {//选中牌
+                        card_play[card_play.length] = this.value;
+                        card.removeClass("layui-btn-primary");
+                    }else{
+                        card.addClass("layui-btn-primary");
+                        var index = card_play.indexOf(this.value);
+                        if (index != -1) {
+                            card_play.splice(index, 1);
+                        }
+                    }
+                } 
+            });
+        }
+
+        //显示出牌信息
+        function showMessage(text) {
+            layer.open({
+                type:1
+                ,title:"出牌"
+                ,content:"<div style=\"padding: 20px 100px;\">"+ text + "</div>"
+                ,shade: 0
+                ,offset:'rt'
+                ,time: 5000
+            })
+        }
+
+        //显示提示
+        function showWarningText(text) {
+            //默认5秒
+            showWarningText(text, 5000);
+        }
+        function showWarningText(text, time) {
+            layer.msg("<div style=\"padding: 20px 100px;\">"+ text + "</div>", {
+                shade: 0
+                ,offset:'r'
+                ,time: time
+            })
+        }
+
+        //显示结果
+        function showResult(text) {
+            layer.msg("<div style=\"padding: 20px 100px;\">"+ text + "</div>", {
+                time: 8000, //8s后自动关闭
+                btn: ['再来一局', '知道了'],
+                shade: 0.3,
+                yes: function (index, layero) {
+                    layer.closeAll();
+                    $('#btn_start').click();
+                },
+                btn2: function(index, layero){
+                    layer.closeAll();
+                }
+            });
+        }
+
+        function id2Str(id) {
+            var prefix = "";
+            if (id == 53) {
+                prefix += "小王";
+            }else if (id == 54) {
+                prefix += "大王";
+            }else {
+                var mod = id % 13;
+                var firstLetter = "";
+                switch (mod) {
+                    case 0:
+                        firstLetter = "K";
+                        break;
+                    case 1:
+                        firstLetter = "A";
+                        break;
+                    case 2:
+                    case 3:
+                    case 4:
+                    case 5:
+                    case 6:
+                    case 7:
+                    case 8:
+                    case 9:
+                    case 10:
+                        firstLetter = "" + mod;
+                        break;
+                    case 11:
+                        firstLetter = "J";
+                        break;
+                    case 12:
+                        firstLetter = "Q";
+                        break;
+                    default:
+                        break;
+                }
+                var secondLetter = "";
+                if (id >= 1 && id <=13) {
+                    secondLetter = "红桃";
+                }else if (id >=14 && id <=26) {
+                    secondLetter = "黑桃";
+                }else if (id >=27 && id <=39) {
+                    secondLetter = "梅花";
+                }else if (id >=40 && id <=52) {
+                    secondLetter = "方块";
+                }
+                prefix = secondLetter + firstLetter;
+            }
+            return prefix;
+        }
+
+    })
+</script>
+
+
+</body>
+</html>
