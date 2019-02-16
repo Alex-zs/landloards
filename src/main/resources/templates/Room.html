@@ -99,6 +99,9 @@
                     "content":JSON.stringify(card_play)
                 }
                 ws.send(JSON.stringify(data));
+                for (var i = 0; i < card_play.length; i++) {
+                    $('#card_' + card_play[i]).addClass("layui-btn-primary ");
+                }
                 card_play = new Array();
             }
         });
